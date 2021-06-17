@@ -1,0 +1,16 @@
+name: 'peach'
+description: 'Prove to a trusted third party that you know secrets known only to a particular running GitHub workflow'
+author: '@andrewesweet'
+inputs:
+  function_uri:
+    required: true
+    description: 'The URI of the Peach service you want to authenticate with'
+  github_token:
+    required: true
+    description: 'The value of secrets.GITHUB_TOKEN'
+outputs:
+  message:
+    description: 'The message returned by the trusted third party'
+runs:
+  using: 'node12'
+  main: 'dist/index.js'

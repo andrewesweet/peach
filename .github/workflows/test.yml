@@ -1,5 +1,5 @@
 name: 'build-test'
-on: # rebuild any PRs and main branch changes
+on:
   pull_request:
   push:
     branches:
@@ -7,18 +7,37 @@ on: # rebuild any PRs and main branch changes
       - 'releases/*'
 
 jobs:
-  build: # make sure build/ci work properly
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - run: |
-          npm install
-      - run: |
-          npm run all
-  test: # make sure the action works on a clean machine without building
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: ./
+      - name: Checkout the source code
+        uses: actions/checkout@v2
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@master
         with:
-          milliseconds: 1000
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+      - name: Build and deploy the service
+        id: deploy
+        working-directory: ./service
+        env:
+            GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          gcloud auth configure-docker --quiet
+          npm ci && npm run all
+          URL=$(gcloud run services list --region europe-west1 --filter "metadata.name=peach" --quiet | awk 'NR==2 {print $4}')
+          echo "::set-output name=url::${URL}"
+      - name: Build the action
+        working-directory: ./action
+        run: |
+          npm ci && npm run all
+      - name: Test the action
+        uses: ./action
+        id: test_action
+        with:
+          function_uri: ${{ steps.deploy.outputs.url }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Show the function output
+        run: |
+          echo "${{ steps.test_action.outputs.message }}"
